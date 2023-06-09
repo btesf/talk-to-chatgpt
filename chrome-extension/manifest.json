@@ -1,8 +1,8 @@
 {
 	"manifest_version": 3,
-	"name": "Talk-to-ChatGPT",
-	"version": "2.6.1",
-	"description": "Talk to ChatGPT through your microphone and hear its responses with a voice. Uses speech recognition and text-to-speech technologies",
+	"name": "Bere-Voice-To-Text",
+	"version": "1.0.0",
+	"description": "Talk to Bere Voice-To-Text through your microphone and hear its responses with a voice. Uses speech recognition and text-to-speech technologies",
 	"action": {
 		"default_popup": "popup.html",
 		"default_icon": {              
@@ -14,7 +14,8 @@
 	"content_scripts":[
 		{
 			"matches":[
-				"https://chat.openai.com/*"
+				"https://*/*",
+				"file:///*"				
 			],
 			"js": ["jquery.min.js", "fontawesome.min.js", "content.js"]
 		}
