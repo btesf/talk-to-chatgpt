@@ -249,7 +249,7 @@ function addUIComponents() {
 							"<span class='CNToggle' title='Voice recognition disabled. Click to enable. (Shortcut: ALT+SHIFT+H)' style='display:none; color: red; opacity: 0.7;' data-cn='micoff'><i class=\"fa-solid fa-microphone-slash\"></i></span>" + // Microphone disabled
 						"</td>" +
 						"<td width='24%' style='text-align: center;'>" +
-							"<span class='CNToggle' title='Settings' data-cn='settings' style='opacity: 0.7;'><i class=\"fa-solid fa-keyboard\"></i></span>" + 					
+							"<span class='CNToggle' title='Settings' data-cn='settings' style='opacity: 0.7;'><i class=\"fa-solid fa-gear\"></i></span>" + 					
 						"</td>" +
 					"</tr></table>" +					
 					// Colored bar - transparent by default, red when mic on, green when bot speaks
@@ -310,7 +310,7 @@ function CN_OnSettingsIconClick() {
 	var rows = "<h2>Voice control</h2>";
 	rows += "<table width='100%' cellpadding=6 cellspacing=2 style='margin-top: 15px;'>";
 	rows += "<tr><td style='white-space: nowrap'>Manual send word(s):</td><td><input type=text id='TTGPTSendWord' style='width: 250px; padding: 2px; color: black;' value='" + CN_SAY_THIS_TO_SEND + "' /><span style='font-size: 10px;'>you can trigger the sending of the message by saying this word (or sequence of words)</span></td></tr>";
-	rows += "<tr><td style='white-space: nowrap'>Manual send word(s):</td><td><input type=text id='TTGPTClearBox' style='width: 250px; padding: 2px; color: black;' value='" + CN_SAY_THIS_TO_CLEAR_BOX + "' /><span style='font-size: 10px;'>you can trigger the sending of the message by saying this word (or sequence of words)</span></td></tr>";
+	rows += "<tr><td style='white-space: nowrap'>Clear textbox word(s):</td><td><input type=text id='TTGPTClearBox' style='width: 250px; padding: 2px; color: black;' value='" + CN_SAY_THIS_TO_CLEAR_BOX + "' /><span style='font-size: 10px;'>you can clear the text box by saying this word (or sequence of words)</span></td></tr>";
 	rows += "<tr><td colspan=2 style='text-align: center'><br />" +
 		"<button class='TTGPTSave' style='border: 2px solid grey; border-radius: 4px; padding: 6px 24px; font-size: 18px; font-weight: bold; opacity: 0.7;'>✓ Save</button>&nbsp;" +
 		"<button class='TTGPTCancel' style='border: 2px solid grey; border-radius: 4px; padding: 6px 24px; margin-left: 40px; font-size: 18px; opacity: 0.7;'>✗ Cancel</button></td></tr></table>";
