@@ -3,68 +3,27 @@
 // Author		: Bereket Tewoldeberhan
 // Version		: 0.1
 
-// Settings for the text-to-speech functionality (the bot's voice)
-var CN_TEXT_TO_SPEECH_RATE = 1; // The higher the rate, the faster the bot will speak
-var CN_TEXT_TO_SPEECH_PITCH = 1; // This will alter the pitch for the bot's voice
-
 // Indicate a locale code such as 'fr-FR', 'en-US', to use a particular language for the speech recognition functionality (when you speak into the mic)
 // If you leave this blank, the system's default language will be used
 var CN_WANTED_LANGUAGE_SPEECH_REC = ""; //"fr-FR";
 
 var CN_SAY_THIS_TO_CLEAR_BOX = "clear box";
 
-// Determine whether commas should be ignored as sentence separators
-var CN_IGNORE_COMMAS = false;
-
 // Determine which word(s) will cause this script to send the current message (if auto-send disabled)
 var CN_SAY_THIS_TO_SEND = "send message now"; 
-
-// Indicate "locale-voice name" (the possible values are difficult to determine, you should just ignore this and use the settings menu instead)
-var CN_WANTED_VOICE_NAME = "";
-
-// Ignore code blocks - anything contained in <pre>
-var CN_IGNORE_CODE_BLOCKS = false;
-
-// Use ElevenLabs for TTS
-var CN_TTS_ELEVENLABS = false;
-
-// ElevenLabs API key
-var CN_TTS_ELEVENLABS_APIKEY = "";
-
-// ElevenLabs voice
-var CN_TTS_ELEVENLABS_VOICE = "";
-
-// Other ElevenLabs settings
-var CN_TTS_ELEVENLABS_STABILITY = "";
-var CN_TTS_ELEVENLABS_SIMILARITY = "";
-
-// ----------------------------
-
 
 // -------------------
 // CODE (DO NOT ALTER)
 // -------------------
-var CN_MESSAGE_COUNT = 0;
-var CN_CURRENT_MESSAGE = null;
-var CN_CURRENT_MESSAGE_SENTENCES = [];
-var CN_CURRENT_MESSAGE_SENTENCES_NEXT_READ = 0;
 var CN_SPEECHREC = null;
-var CN_IS_READING = false;
 var CN_IS_LISTENING = false;
 var CN_FINISHED = false;
 var CN_PAUSED = false;
-var CN_WANTED_VOICE = null;
-var CN_TIMEOUT_KEEP_SYNTHESIS_WORKING = null;
 var CN_TIMEOUT_KEEP_SPEECHREC_WORKING = null;
 var CN_SPEECH_REC_SUPPORTED = false;
-var CN_SPEAKING_DISABLED = false;
 var CN_SPEECHREC_DISABLED = false;
 var CN_CONVERSATION_SUSPENDED = false;
 var CN_BAR_COLOR_FLASH_GREY = false;
-var CN_TTS_ELEVENLABS_QUEUE = [];
-var CN_IS_CONVERTING = false;
-var CN_IS_PLAYING = false;
-var CN_CURRENT_AUDIO = null;
 
 // Send a message to the bot (will simply put text in the textarea and simulate a send button click)
 function CN_SendMessage(text) {
@@ -98,9 +57,7 @@ function CN_FlashRedBar() {
 	}
 	
 	// Is it green? don't do anything
-	if (CN_IS_READING) {
-		// Ignore
-	} else if (CN_BAR_COLOR_FLASH_GREY) {
+	if (CN_BAR_COLOR_FLASH_GREY) {
 		// Grey? switch to red
 		$("#CNStatusBar").css("background", "red");
 		CN_BAR_COLOR_FLASH_GREY = false;
@@ -139,11 +96,6 @@ function CN_ResumeAfterSuspension() {
 
 // Start speech recognition using the browser's speech recognition API
 function CN_StartSpeechRecognition() {
-	if (CN_IS_READING) {
-		clearTimeout(CN_TIMEOUT_KEEP_SPEECHREC_WORKING);
-		CN_TIMEOUT_KEEP_SPEECHREC_WORKING = setTimeout(CN_KeepSpeechRecWorking, 100);
-		return;
-	}
 	if (!CN_SPEECH_REC_SUPPORTED) return;
 	CN_SPEECHREC = ('webkitSpeechRecognition' in window) ? new webkitSpeechRecognition() : new SpeechRecognition();
 	CN_SPEECHREC.continuous = true;
@@ -205,7 +157,7 @@ function CN_StartSpeechRecognition() {
 		// Send the message
 		CN_SendMessage(final_transcript);
 	};
-	if (!CN_IS_LISTENING && CN_SPEECH_REC_SUPPORTED && !CN_SPEECHREC_DISABLED && !CN_IS_READING) CN_SPEECHREC.start();
+	if (!CN_IS_LISTENING && CN_SPEECH_REC_SUPPORTED && !CN_SPEECHREC_DISABLED) CN_SPEECHREC.start();
 	clearTimeout(CN_TIMEOUT_KEEP_SPEECHREC_WORKING);
 	CN_TIMEOUT_KEEP_SPEECHREC_WORKING = setTimeout(CN_KeepSpeechRecWorking, 100);
 }
@@ -215,13 +167,13 @@ function CN_KeepSpeechRecWorking() {
 	if (CN_FINISHED) return; // Conversation finished
 	clearTimeout(CN_TIMEOUT_KEEP_SPEECHREC_WORKING);
 	CN_TIMEOUT_KEEP_SPEECHREC_WORKING = setTimeout(CN_KeepSpeechRecWorking, 100);
-	if (!CN_IS_READING && !CN_IS_LISTENING && !CN_PAUSED) {
-		if (!CN_SPEECHREC && !CN_IS_READING)
+	if (!CN_IS_LISTENING && !CN_PAUSED) {
+		if (!CN_SPEECHREC)
 			CN_StartSpeechRecognition();
 		else {
 			if (!CN_IS_LISTENING) {
 				try {
-					if (CN_SPEECH_REC_SUPPORTED && !window.speechSynthesis.speaking && !CN_SPEECHREC_DISABLED && !CN_IS_READING)
+					if (CN_SPEECH_REC_SUPPORTED && !window.speechSynthesis.speaking && !CN_SPEECHREC_DISABLED)
 						CN_SPEECHREC.start();
 				} catch(e) { }
 			}
@@ -259,7 +211,7 @@ function CN_ToggleButtonClick() {
 			
 			// Enable speech rec
 			CN_SPEECHREC_DISABLED = false;
-			if (CN_SPEECHREC && !CN_IS_LISTENING && !CN_IS_READING) CN_SPEECHREC.start();
+			if (CN_SPEECHREC && !CN_IS_LISTENING) CN_SPEECHREC.start();
 			
 			return;
 	}
@@ -298,15 +250,7 @@ function CN_StartTTGPT() {
 	
 	setTimeout(function() {
 		// Start speech rec
-		CN_StartSpeechRecognition();
-		
-		// Make sure message count starts from last; we don't want to read the latest message
-		var currentMessageCount = jQuery(".text-base").length;
-		if (currentMessageCount > CN_MESSAGE_COUNT) {
-			// New message!
-			CN_MESSAGE_COUNT = currentMessageCount;
-			CN_CURRENT_MESSAGE = null; // Set current message to null
-		}
+		CN_StartSpeechRecognition();	
 	}, 250);
 }
 
