@@ -11,19 +11,7 @@ var CN_TEXT_TO_SPEECH_PITCH = 1; // This will alter the pitch for the bot's voic
 // If you leave this blank, the system's default language will be used
 var CN_WANTED_LANGUAGE_SPEECH_REC = ""; //"fr-FR";
 
-// Determine which word will cause this scrip to stop.
-var CN_SAY_THIS_WORD_TO_STOP = "stop";
-
-// Determine which word will cause this script to temporarily pause
-var CN_SAY_THIS_WORD_TO_PAUSE = "pause";
-
 var CN_SAY_THIS_TO_CLEAR_BOX = "clear box";
-
-// Do we keep listening even when paused, so that we can resume by a vocal command?
-var CN_KEEP_LISTENING = true;
-
-// Determine whether messages are sent immediately after speaing
-var CN_AUTO_SEND_AFTER_SPEAKING = true;
 
 // Determine whether commas should be ignored as sentence separators
 var CN_IGNORE_COMMAS = false;
@@ -77,165 +65,6 @@ var CN_TTS_ELEVENLABS_QUEUE = [];
 var CN_IS_CONVERTING = false;
 var CN_IS_PLAYING = false;
 var CN_CURRENT_AUDIO = null;
-
-// This function will say the given text out loud using the browser's speech synthesis API, or send the message to the ElevenLabs conversion stack
-function CN_SayOutLoud(text) {
-	// Have we no text to say? Or did we disable text-to-speech? Make sure to continue listening, if that's what we want
-	if (!text || CN_SPEAKING_DISABLED) {
-		if (CN_SPEECH_REC_SUPPORTED && CN_SPEECHREC && !CN_IS_LISTENING && !CN_PAUSED && !CN_SPEECHREC_DISABLED && !CN_IS_READING) CN_SPEECHREC.start();
-		clearTimeout(CN_TIMEOUT_KEEP_SPEECHREC_WORKING);
-		CN_TIMEOUT_KEEP_SPEECHREC_WORKING = setTimeout(CN_KeepSpeechRecWorking, 100);
-		return;
-	}
-	
-	// Are we speaking?
-	if (CN_SPEECHREC) {
-		clearTimeout(CN_TIMEOUT_KEEP_SPEECHREC_WORKING);
-		CN_SPEECHREC.stop();
-	}
-	
-	// Let's speak out loud with the browser's text-to-speech API
-	console.log("[BROWSER] Saying out loud: " + text);
-	var msg = new SpeechSynthesisUtterance();
-	msg.text = text;
-	
-	if (CN_WANTED_VOICE) msg.voice = CN_WANTED_VOICE;
-	msg.rate = CN_TEXT_TO_SPEECH_RATE;
-	msg.pitch = CN_TEXT_TO_SPEECH_PITCH;
-	msg.onstart = () => {
-		// Make border green
-		$("#CNStatusBar").css("background", "green");
-		
-		// If speech recognition is active, disable it
-		if (CN_IS_LISTENING) CN_SPEECHREC.stop();
-		
-		if (CN_FINISHED) return;
-		CN_IS_READING = true;
-		clearTimeout(CN_TIMEOUT_KEEP_SYNTHESIS_WORKING);
-		CN_TIMEOUT_KEEP_SYNTHESIS_WORKING = setTimeout(CN_KeepSpeechSynthesisActive, 5000);
-	};
-	msg.onend = () => {
-		CN_AfterSpeakOutLoudFinished();
-	}
-	CN_IS_READING = true;
-	window.speechSynthesis.speak(msg);
-}
-
-// Occurs when speaking out loud is finished
-function CN_AfterSpeakOutLoudFinished() {
-	if (CN_SPEECHREC_DISABLED) return;
-	
-	// Make border grey again
-	$("#CNStatusBar").css("background", "grey");
-	
-	if (CN_FINISHED) return;
-	
-	// Finished speaking
-	clearTimeout(CN_TIMEOUT_KEEP_SYNTHESIS_WORKING);
-	console.log("Finished speaking out loud");
-	
-	// restart listening
-	CN_IS_READING = false;
-	setTimeout(function() {
-		if (!window.speechSynthesis.speaking) {
-			if (CN_SPEECH_REC_SUPPORTED && CN_SPEECHREC && !CN_IS_LISTENING && !CN_PAUSED && !CN_SPEECHREC_DISABLED && !CN_IS_READING) CN_SPEECHREC.start();
-			clearTimeout(CN_TIMEOUT_KEEP_SPEECHREC_WORKING);
-			CN_TIMEOUT_KEEP_SPEECHREC_WORKING = setTimeout(CN_KeepSpeechRecWorking, 100);
-		}
-	}, 500);
-}
-
-// This is a workaround for Chromium's bug in the speech synthesis API (https://stackoverflow.com/questions/21947730/chrome-speech-synthesis-with-longer-texts)
-function CN_KeepSpeechSynthesisActive() {
-	console.log("Keeping speech synthesis active...");
-	window.speechSynthesis.pause();
-	window.speechSynthesis.resume();
-	CN_TIMEOUT_KEEP_SYNTHESIS_WORKING = setTimeout(CN_KeepSpeechSynthesisActive, 5000);
-}
-
-// Split the text into sentences so the speech synthesis can start speaking as soon as possible
-function CN_SplitIntoSentences(text) {
-	var sentences = [];
-	var currentSentence = "";
-	
-	for(const element of text) {
-		//
-		var currentChar = element;
-		
-		// Add character to current sentence
-		currentSentence += currentChar;
-		
-		// is the current character a delimiter? if so, add current part to array and clear
-		if (
-			// Latin punctuation
-		       currentChar == (CN_IGNORE_COMMAS?'.':',')
-			|| currentChar == (CN_IGNORE_COMMAS ? '.' : ':')
-			|| currentChar == '.' 
-			|| currentChar == '!' 
-			|| currentChar == '?' 
-			|| currentChar == (CN_IGNORE_COMMAS ? '.' : ';')
-			|| currentChar == '…'
-			// Chinese/japanese punctuation
-			|| currentChar == (CN_IGNORE_COMMAS ? '.' : '、')
-			|| currentChar == (CN_IGNORE_COMMAS ? '.' : '，')
-			|| currentChar == '。'
-			|| currentChar == '．'
-			|| currentChar == '！'
-			|| currentChar == '？'
-			|| currentChar == (CN_IGNORE_COMMAS ? '.' : '；')
-			|| currentChar == (CN_IGNORE_COMMAS ? '.' : '：')
-			) {
-			if (currentSentence.trim() != "") sentences.push(currentSentence.trim());
-			currentSentence = "";
-		}
-	}
-	
-	return sentences;
-}
-
-// Check for new messages the bot has sent. If a new message is found, it will be read out loud
-function CN_CheckNewMessages() {
-	// Any new messages?
-	var currentMessageCount = jQuery(".text-base").length;
-	if (currentMessageCount > CN_MESSAGE_COUNT) {
-		// New message!
-		console.log("New message detected! currentMessageCount: " + currentMessageCount);
-		CN_MESSAGE_COUNT = currentMessageCount;
-		CN_CURRENT_MESSAGE = jQuery(".text-base:last").find(".items-start");
-		CN_CURRENT_MESSAGE_SENTENCES = []; // Reset list of parts already spoken
-		CN_CURRENT_MESSAGE_SENTENCES_NEXT_READ = 0;
-	}
-	
-	// Split current message into parts
-	if (CN_CURRENT_MESSAGE && CN_CURRENT_MESSAGE.length) {
-		var currentText = jQuery(".text-base:last").find(".items-start").text()+"";
-		//console.log("currentText:" + currentText);
-		
-		// Remove code blocks?
-		if (CN_IGNORE_CODE_BLOCKS) {
-			currentText = jQuery(".text-base:last").find(".items-start").find(".markdown").contents().not("pre").text();
-			//console.log("[CODE] currentText:" + currentText);
-		}
-		
-		var newSentences = CN_SplitIntoSentences(currentText);
-		if (newSentences != null && newSentences.length != CN_CURRENT_MESSAGE_SENTENCES.length) {
-			//console.log("[NEW SENTENCES] newSentences:" + newSentences.length);
-			
-			// There is a new part of a sentence!
-			var nextRead = CN_CURRENT_MESSAGE_SENTENCES_NEXT_READ;
-			for (i = nextRead; i < newSentences.length; i++) {
-				CN_CURRENT_MESSAGE_SENTENCES_NEXT_READ = i+1;
-
-				var lastPart = newSentences[i];
-				//console.log("Will say sentence out loud: "+lastPart);
-				CN_SayOutLoud(lastPart);
-			}
-			CN_CURRENT_MESSAGE_SENTENCES = newSentences;
-		}
-	}
-	
-	setTimeout(CN_CheckNewMessages, 100);
-}
 
 // Send a message to the bot (will simply put text in the textarea and simulate a send button click)
 function CN_SendMessage(text) {
@@ -321,15 +150,13 @@ function CN_StartSpeechRecognition() {
 	CN_SPEECHREC.lang = CN_WANTED_LANGUAGE_SPEECH_REC;
 	CN_SPEECHREC.onstart = () => {
 		// Make bar red
-		$("#CNStatusBar").css("background", "red");
-		
+		$("#CNStatusBar").css("background", "red");		
 		CN_IS_LISTENING = true;
 		console.log("I'm listening");
 	};
 	CN_SPEECHREC.onend = () => {
 		// Make border grey again
-		$("#CNStatusBar").css("background", "grey");
-		
+		$("#CNStatusBar").css("background", "grey");		
 		CN_IS_LISTENING = false;
 		console.log("I've stopped listening");
 	};
@@ -342,34 +169,12 @@ function CN_StartSpeechRecognition() {
 		for (let i = event.resultIndex; i < event.results.length; ++i) {
 			if (event.results[i].isFinal)
 				final_transcript += event.results[i][0].transcript;
-		}
-		
+		}		
 		console.log("Voice recognition: '"+ (final_transcript)+"'");
 		
 		// Empty? https://github.com/C-Nedelcu/talk-to-chatgpt/issues/72
 		if (final_transcript.trim() == "") {
 			console.log("Empty sentence detected, ignoring");
-			return;
-		}
-		
-		if (CN_RemovePunctuation(final_transcript) == CN_SAY_THIS_WORD_TO_STOP.toLowerCase().trim()) {
-			
-			if (CN_CONVERSATION_SUSPENDED) {
-				console.log("Conversation is currently suspended, voice command ignored. Use the pause word to resume conversation.");
-				return;
-			}
-			
-			console.log("You said '"+ CN_SAY_THIS_WORD_TO_STOP+"'. Conversation ended");
-			CN_FINISHED = true;
-			CN_PAUSED = false;
-			CN_SPEECHREC.stop();
-			CN_SayOutLoud("Bye bye");
-			alert("Conversation ended. Click the Start button to resume");
-			
-			// Show start button, hide action buttons
-			jQuery(".CNStartZone").show();
-			jQuery(".CNActionButtons").hide();
-			
 			return;
 		}
 
@@ -457,72 +262,6 @@ function CN_ToggleButtonClick() {
 			if (CN_SPEECHREC && !CN_IS_LISTENING && !CN_IS_READING) CN_SPEECHREC.start();
 			
 			return;
-		
-		// The bot's voice is on. Turn it off
-		case "speakon":
-			// Show other icon and hide this one
-			$(this).css("display", "none");
-			$(".CNToggle[data-cn=speakoff]").css("display", "");
-			CN_SPEAKING_DISABLED = true;
-			
-			// Is there anything in the CN_TTS_ELEVENLABS_QUEUE ? clear it
-			if (CN_TTS_ELEVENLABS_QUEUE.length) {
-				CN_TTS_ELEVENLABS_QUEUE = [];
-				if (CN_CURRENT_AUDIO) CN_CURRENT_AUDIO.pause();
-				CN_CURRENT_AUDIO = null;
-				CN_IS_PLAYING = false;
-				CN_IS_READING = false;
-				CN_IS_CONVERTING = false;
-			}
-			
-			// Stop current message (equivalent to 'skip')
-			window.speechSynthesis.pause(); // Pause, and then...
-			window.speechSynthesis.cancel(); // Cancel everything
-			CN_CURRENT_MESSAGE = null; // Remove current message
-			
-			// Restart listening maybe?
-			if (!CN_SPEECHREC_DISABLED) {
-				setTimeout(function () {
-					CN_AfterSpeakOutLoudFinished();
-				}, 100);
-			}
-			
-			return;
-		
-		// The bot's voice is off. Turn it on
-		case "speakoff":
-			// Show other icon and hide this one
-			$(this).css("display", "none");
-			$(".CNToggle[data-cn=speakon]").css("display", "");
-			CN_SPEAKING_DISABLED = false;
-			
-			return;
-		
-		// Skip current message being read
-		case "skip":
-			
-			// Is there anything in the CN_TTS_ELEVENLABS_QUEUE ?  clear it
-			if (CN_TTS_ELEVENLABS_QUEUE.length) {
-				CN_TTS_ELEVENLABS_QUEUE = [];
-				if (CN_CURRENT_AUDIO) CN_CURRENT_AUDIO.pause();
-				CN_CURRENT_AUDIO = null;
-				CN_IS_PLAYING = false;
-				CN_IS_READING = false;
-				CN_IS_CONVERTING = false;
-			}
-			
-			window.speechSynthesis.pause(); // Pause, and then...
-			window.speechSynthesis.cancel(); // Cancel everything
-			CN_CURRENT_MESSAGE = null; // Remove current message
-			
-			// Restart listening maybe?
-			if (!CN_SPEECHREC_DISABLED) {
-				setTimeout(function () {
-					CN_AfterSpeakOutLoudFinished();
-				}, 100);
-			}
-			
-			return;
 	}
 }
 
@@ -568,9 +307,6 @@ function CN_StartTTGPT() {
 			CN_MESSAGE_COUNT = currentMessageCount;
 			CN_CURRENT_MESSAGE = null; // Set current message to null
 		}
-		
-		// Check for new messages
-		CN_CheckNewMessages();
 	}, 250);
 }
 
@@ -605,44 +341,15 @@ function CN_InitScript() {
 	// Restore settings
 	CN_RestoreSettings();
 	
-	// Wait on voices to be loaded before fetching list
-	window.speechSynthesis.onvoiceschanged = function () {
-		if (!CN_WANTED_VOICE_NAME){
-			console.log("Reading with default browser voice");
-		} else {
-			speechSynthesis.getVoices().forEach(function (voice) {
-				//console.log("Found possible voice: " + voice.name + " (" + voice.lang + ")");
-				if (voice.lang + "-" + voice.name == CN_WANTED_VOICE_NAME) {
-					CN_WANTED_VOICE = voice;
-					console.log("I will read using voice " + voice.name + " (" + voice.lang + ")");
-					return false;
-				}
-			});
-			if (!CN_WANTED_VOICE)
-				console.log("No voice found for '" + CN_WANTED_VOICE_NAME + "', reading with default browser voice");
-		}
-		
-		// Voice OK
-		setTimeout(function() {
-			//CN_SayOutLoud("OK");
-		}, 1000);
-	};
-	
 	// Add icons on the top right corner
 	jQuery("body").append(
 		"<div style='position: fixed; top: 8px; right: 16px; display: inline-block; " +
 			"background: #41464c; color: white; padding: 0; font-size: 16px; border-radius: 8px; text-align: center;" +
 			"cursor: move; font-weight: bold; z-index: 1111;' id='TTGPTSettings'>" +
-		
 			// Logo / title
-			"<div style='padding: 4px 40px; border-bottom: 1px solid grey;'>" +
-				"<a href='https://github.com/C-Nedelcu/talk-to-chatgpt' " +
-					"style='display: inline-block; font-size: 20px; line-height: 80%; padding: 8px 0;' " +
-					"target=_blank title='Visit project website'>Talk to C.ai<br />" +
-					"<div style='text-align: right; font-size: 12px; color: grey'>V0.1</div>" +
-				"</a>" +
-			"</div>" +
-			
+			"<div style='padding: 4px 40px; border-bottom: 1px solid grey;'>" +		
+					"Talk to C.ai" +
+			"</div>" +			
 			// Below logo
 			"<div>" +
 				
@@ -657,6 +364,9 @@ function CN_InitScript() {
 						"<td width='24%' style='text-align: center;'>" +
 							"<span class='CNToggle' title='Voice recognition enabled. Click to disable. (Shortcut: ALT+SHIFT+H)' data-cn='micon' style='opacity: 0.7;'><i class=\"fa-solid fa-microphone\"></i></span>" + // Microphone enabled
 							"<span class='CNToggle' title='Voice recognition disabled. Click to enable. (Shortcut: ALT+SHIFT+H)' style='display:none; color: red; opacity: 0.7;' data-cn='micoff'><i class=\"fa-solid fa-microphone-slash\"></i></span>" + // Microphone disabled
+						"</td>" +
+						"<td width='24%' style='text-align: center;'>" +
+							"<span class='CNToggle' title='Settings' data-cn='settings' style='opacity: 0.7;'><i class=\"fa-solid fa-keyboard\"></i></span>" + 					
 						"</td>" +
 					"</tr></table>" +
 					
@@ -723,99 +433,13 @@ function CN_InitScript() {
 // Open settings menu
 function CN_OnSettingsIconClick() {
 	console.log("Opening settings menu");
-	
-	// Stop listening
-	CN_PAUSED = true;
-	if (CN_SPEECHREC) CN_SPEECHREC.stop();
-	
-	// Prepare settings row
-	var rows = "<h2>Language and speech settings</h2>";
+	var rows = "<h2>Voice control</h2>";
 	rows += "<table width='100%' cellpadding=6 cellspacing=2 style='margin-top: 15px;'>";
-	
-	// 1. Bot's voice
-	var voices = "";
-	var n = 0;
-	speechSynthesis.getVoices().forEach(function (voice) {
-		var label = `${voice.name} (${voice.lang})`;
-		if (voice.default) label += ' — DEFAULT';
-		var SEL = (CN_WANTED_VOICE && CN_WANTED_VOICE.lang == voice.lang && CN_WANTED_VOICE.name == voice.name) ? "selected=selected": "";
-		voices += "<option value='"+n+"' "+SEL+">"+label+"</option>";
-		n++;
-	});
-	
-	// 4. Speech recognition language CN_WANTED_LANGUAGE_SPEECH_REC
-	var languages = "<option value=''></option>";
-	for(var i in CN_SPEECHREC_LANGS) {
-		var languageName = CN_SPEECHREC_LANGS[i][0];
-		for(var j in CN_SPEECHREC_LANGS[i]) {
-			if (j == 0) continue;
-			var languageCode = CN_SPEECHREC_LANGS[i][j][0];
-			var SEL = languageCode == CN_WANTED_LANGUAGE_SPEECH_REC ? "selected='selected'": "";
-			languages += "<option value='"+languageCode+"' "+SEL+">"+languageName+" - "+languageCode+"</option>";
-		}
-	}
-	rows += "<tr><td style='white-space: nowrap'>Speech recognition language:</td><td><select id='TTGPTRecLang' style='width: 250px; padding: 2px; color: black;' >"+languages+"</select></td></tr>";
-	
-	rows += "<tr class='CNBrowserTTS' ><td style='white-space: nowrap'>AI voice and language:</td><td><select id='TTGPTVoice' style='width: 250px; padding: 2px; color: black'>" + voices + "</select></td></tr>";
-	
-	// 2. AI talking speed
-	rows += "<tr class='CNBrowserTTS' ><td style='white-space: nowrap'>AI talking speed (speech rate):</td><td><input type=number step='.1' id='TTGPTRate' style='color: black; padding: 2px; width: 100px;' value='" + CN_TEXT_TO_SPEECH_RATE + "' /></td></tr>";
-	
-	// 3. AI voice pitch
-	rows += "<tr class='CNBrowserTTS' ><td style='white-space: nowrap'>AI voice pitch:</td><td><input type=number step='.1' id='TTGPTPitch' style='width: 100px; padding: 2px; color: black;' value='" + CN_TEXT_TO_SPEECH_PITCH + "' /></td></tr>";
-
-	// Prepare save/close buttons
+	rows += "<tr><td style='white-space: nowrap'>Manual send word(s):</td><td><input type=text id='TTGPTSendWord' style='width: 250px; padding: 2px; color: black;' value='" + CN_SAY_THIS_TO_SEND + "' /><span style='font-size: 10px;'>you can trigger the sending of the message by saying this word (or sequence of words)</span></td></tr>";
+	rows += "<tr><td style='white-space: nowrap'>Manual send word(s):</td><td><input type=text id='TTGPTClearBox' style='width: 250px; padding: 2px; color: black;' value='" + CN_SAY_THIS_TO_CLEAR_BOX + "' /><span style='font-size: 10px;'>you can trigger the sending of the message by saying this word (or sequence of words)</span></td></tr>";
 	rows += "<tr><td colspan=2 style='text-align: center'><br />" +
 		"<button class='TTGPTSave' style='border: 2px solid grey; border-radius: 4px; padding: 6px 24px; font-size: 18px; font-weight: bold; opacity: 0.7;'>✓ Save</button>&nbsp;" +
 		"<button class='TTGPTCancel' style='border: 2px solid grey; border-radius: 4px; padding: 6px 24px; margin-left: 40px; font-size: 18px; opacity: 0.7;'>✗ Cancel</button></td></tr></table>";
-	
-	// Header - vocal commands
-	rows += "</table><br /><h2>Voice control</h2>";
-	rows += "<table width='100%' cellpadding=6 cellspacing=2 style='margin-top: 15px;'>";
-	
-	// 5. 'Stop' word
-	rows += "<tr><td style='white-space: nowrap'>'Stop' word:</td><td><input type=text id='TTGPTStopWord' style='width: 100px; padding: 2px; color: black;' value='"+CN_SAY_THIS_WORD_TO_STOP+"' /></td></tr>";
-	
-	// 6. 'Pause' word
-	rows += "<tr><td style='white-space: nowrap'>'Pause' word:</td><td><input type=text id='TTGPTPauseWord' style='width: 100px; padding: 2px; color: black;' value='"+CN_SAY_THIS_WORD_TO_PAUSE+"' /></td></tr>";
-
-	// 7. Keep listening until resume
-	rows += "<tr><td style='white-space: nowrap'>Keep listening when paused:</td><td><input type=checkbox id='TTGPTKeepListening' " + (CN_KEEP_LISTENING ? "checked=checked" : "") + " /> <label for='TTGPTKeepListening'>When paused, keep the microphone open, and resume conversation when the 'pause' word (defined above) is spoken</label></td></tr>";
-	
-	// 8. Autosend
-	rows += "<tr><td style='white-space: nowrap'>Automatic send:</td><td><input type=checkbox id='TTGPTAutosend' "+(CN_AUTO_SEND_AFTER_SPEAKING?"checked=checked":"")+" /> <label for='TTGPTAutosend'>Automatically send message to ChatGPT after speaking</label></td></tr>";
-	
-	// 9. Manual send word
-	rows += "<tr><td style='white-space: nowrap'>Manual send word(s):</td><td><input type=text id='TTGPTSendWord' style='width: 250px; padding: 2px; color: black;' value='" + CN_SAY_THIS_TO_SEND + "' /><span style='font-size: 10px;'>If 'automatic send' is disabled, you can trigger the sending of the message by saying this word (or sequence of words)</span></td></tr>";
-	
-	// Prepare save/close buttons
-	rows += "<tr><td colspan=2 style='text-align: center'><br />" +
-		"<button class='TTGPTSave' style='border: 2px solid grey; border-radius: 4px; padding: 6px 24px; font-size: 18px; font-weight: bold; opacity: 0.7;'>✓ Save</button>&nbsp;" +
-		"<button class='TTGPTCancel' style='border: 2px solid grey; border-radius: 4px; padding: 6px 24px; margin-left: 40px; font-size: 18px; opacity: 0.7;'>✗ Cancel</button></td></tr></table>";
-	
-	// Header - advanced options
-	rows += "</table><br /><h2>Advanced settings</h2>";
-	rows += "<table width='100%' cellpadding=6 cellspacing=2 style='margin-top: 15px;'>";
-	
-	// 10. Split sentences with commas
-	rows += "<tr><td style='white-space: nowrap'>Punctuation in sentences:</td><td><input type=checkbox id='TTGPTIgnoreCommas' " + (CN_IGNORE_COMMAS ? "checked=checked" : "") + " /> <label for='TTGPTIgnoreCommas'>Don't use commas/semicolons/etc. to break down replies into sentences</label></td></tr>";
-	
-	// 11. Ignore code blocks
-	rows += "<tr><td style='white-space: nowrap'>Ignore code blocks:</td><td><input type=checkbox id='TTGPTIgnoreCode' " + (CN_IGNORE_CODE_BLOCKS ? "checked=checked" : "") + " /> <label for='TTGPTIgnoreCode'>Don't read blocks of code out loud (ignore them altogether)</label></td></tr>";
-	
-	// Keyboard shortcuts
-	rows += "<tr><td style='white-space: nowrap'>Keyboard shortcuts:</td><td><ul>" +
-		"<li>ALT+SHIFT+S: <u>S</u>tart Talk-To-ChatGPT</li>" +
-		"<li>ALT+SHIFT+H: suspend/resume speech recognition (<u>H</u>ush)</li>" +
-		"<li>ALT+SHIFT+V: suspend/resume bot's voice (<u>V</u>oice)</li>" +
-		"<li>ALT+SHIFT+L: skip current message (<u>L</u>eap)</li>" +
-		"</ul></td></tr>";
-	
-	// Prepare save/close buttons
-	rows += "<tr><td colspan=2 style='text-align: center'><br />" +
-		"<button class='TTGPTSave' style='border: 2px solid grey; border-radius: 4px; padding: 6px 24px; font-size: 18px; font-weight: bold; opacity: 0.7;'>✓ Save</button>&nbsp;" +
-		"<button class='TTGPTCancel' style='border: 2px solid grey; border-radius: 4px; padding: 6px 24px; margin-left: 40px; font-size: 18px; opacity: 0.7;'>✗ Cancel</button></td></tr></table>";
-	
 	
 	// Open a whole screenful of settings
 	jQuery("body").append("<div style='background: rgba(0,0,0,0.8); position: absolute; overflow-y: auto; top: 0; right: 0; left: 0; bottom: 0; z-index: 999999; padding: 20px; color: white; font-size: 13px;' id='TTGPTSettingsArea'>" +
@@ -825,18 +449,7 @@ function CN_OnSettingsIconClick() {
 	setTimeout(function() {
 		jQuery(".TTGPTSave").on("click", CN_SaveSettings);
 		jQuery(".TTGPTCancel").on("click", CN_CloseSettingsDialog);
-		
-		// When the ElevenLabs option is changed
-		jQuery("#TTGPTElevenLabs").on("change", function() {
-			if (jQuery(this).prop("checked")) {
-				jQuery(".CNElevenLabs").show();
-				jQuery(".CNBrowserTTS").hide();
-			}
-			else {
-				jQuery(".CNElevenLabs").hide();
-				jQuery(".CNBrowserTTS").show();
-			}
-		});				
+					
 	}, 100);
 }
 
@@ -845,58 +458,12 @@ function CN_SaveSettings() {
 	
 	// Save settings
 	try {
-		// AI voice settings: voice/language, rate, pitch
-		var wantedVoiceIndex = jQuery("#TTGPTVoice").val();
-		var allVoices = speechSynthesis.getVoices();
-		CN_WANTED_VOICE = allVoices[wantedVoiceIndex];
-		CN_WANTED_VOICE_NAME = CN_WANTED_VOICE ? CN_WANTED_VOICE.lang+"-"+CN_WANTED_VOICE.name : "";
-		CN_TEXT_TO_SPEECH_RATE = Number( jQuery("#TTGPTRate").val() );
-		CN_TEXT_TO_SPEECH_PITCH = Number( jQuery("#TTGPTPitch").val() );
-		
-		// Speech recognition settings: language, stop, pause
-		CN_WANTED_LANGUAGE_SPEECH_REC = jQuery("#TTGPTRecLang").val();
-		CN_SAY_THIS_WORD_TO_STOP = CN_RemovePunctuation( jQuery("#TTGPTStopWord").val() );
-		CN_SAY_THIS_WORD_TO_PAUSE = CN_RemovePunctuation( jQuery("#TTGPTPauseWord").val() );
-		CN_KEEP_LISTENING = jQuery("#TTGPTKeepListening").prop("checked");
-		CN_AUTO_SEND_AFTER_SPEAKING = jQuery("#TTGPTAutosend").prop("checked");
 		CN_SAY_THIS_TO_SEND = CN_RemovePunctuation( jQuery("#TTGPTSendWord").val() );
-		CN_IGNORE_COMMAS = jQuery("#TTGPTIgnoreCommas").prop("checked");
-		CN_IGNORE_CODE_BLOCKS = jQuery("#TTGPTIgnoreCode").prop("checked");
-		
-		// ElevenLabs
-		CN_TTS_ELEVENLABS = jQuery("#TTGPTElevenLabs").prop("checked");
-		CN_TTS_ELEVENLABS_APIKEY = CN_RemovePunctuation(jQuery("#TTGPTElevenLabsKey").val()+"");
-		CN_TTS_ELEVENLABS_VOICE = jQuery("#TTGPTElevenLabsVoice").val()+"";
-		CN_TTS_ELEVENLABS_STABILITY = jQuery("#TTGPTElevenLabsStability").val();
-		CN_TTS_ELEVENLABS_SIMILARITY = jQuery("#TTGPTElevenLabsSimilarity").val();
-		
-		// If ElevenLabs is active, and that there is no voice, error out
-		if (CN_TTS_ELEVENLABS && !CN_TTS_ELEVENLABS_VOICE) {
-			alert("To enable ElevenLabs support, you must select a voice in the dropdown list. Click the Refresh List button. If no voice appears in the list, check your API key. If you are 100% sure your API key is valid, please report the issue on the Github project page, on the Issues tab.");
-			return;
-		}
-		
-		// Apply language to speech recognition instance
-		if (CN_SPEECHREC) CN_SPEECHREC.lang = CN_WANTED_LANGUAGE_SPEECH_REC;
-		
+		CN_SAY_THIS_TO_CLEAR_BOX = CN_RemovePunctuation( jQuery("#TTGPTClearBox").val() );
 		// Save settings in cookie
 		var settings = [
-			CN_WANTED_VOICE_NAME,
-			CN_TEXT_TO_SPEECH_RATE,
-			CN_TEXT_TO_SPEECH_PITCH,
-			CN_WANTED_LANGUAGE_SPEECH_REC,
-			CN_SAY_THIS_WORD_TO_STOP,
-			CN_SAY_THIS_WORD_TO_PAUSE,
-			CN_AUTO_SEND_AFTER_SPEAKING?1:0,
 			CN_SAY_THIS_TO_SEND,
-			CN_IGNORE_COMMAS?1:0,
-			CN_KEEP_LISTENING?1:0,
-			CN_IGNORE_CODE_BLOCKS?1:0,
-			CN_TTS_ELEVENLABS?1:0,
-			CN_TTS_ELEVENLABS_APIKEY,
-			CN_TTS_ELEVENLABS_VOICE,
-			CN_TTS_ELEVENLABS_STABILITY,
-			CN_TTS_ELEVENLABS_SIMILARITY
+			CN_SAY_THIS_TO_CLEAR_BOX
 		];
 		CN_SetCookie("CN_TTGPT", JSON.stringify(settings));
 	} catch(e) { alert('Invalid settings values. '+e.toString()); return; }
@@ -916,22 +483,8 @@ function CN_RestoreSettings() {
 		var settings = JSON.parse(settingsRaw);
 		if (typeof settings == "object" && settings != null) {
 			console.log("Reloading settings from cookie: "+settings);
-			CN_WANTED_VOICE_NAME = settings[0];
-			CN_TEXT_TO_SPEECH_RATE = settings[1];
-			CN_TEXT_TO_SPEECH_PITCH = settings[2];
-			CN_WANTED_LANGUAGE_SPEECH_REC = settings[3];
-			CN_SAY_THIS_WORD_TO_STOP = settings[4];
-			CN_SAY_THIS_WORD_TO_PAUSE = settings[5];
-			if (settings.hasOwnProperty(6)) CN_AUTO_SEND_AFTER_SPEAKING = settings[6] == 1;
-			if (settings.hasOwnProperty(7)) CN_SAY_THIS_TO_SEND = settings[7];
-			if (settings.hasOwnProperty(8)) CN_IGNORE_COMMAS = settings[8] == 1;
-			if (settings.hasOwnProperty(9)) CN_KEEP_LISTENING = settings[9] == 1;
-			if (settings.hasOwnProperty(10)) CN_IGNORE_CODE_BLOCKS = settings[10] == 1;
-			if (settings.hasOwnProperty(11)) CN_TTS_ELEVENLABS = settings[11] == 1;
-			if (settings.hasOwnProperty(12)) CN_TTS_ELEVENLABS_APIKEY = settings[12];
-			if (settings.hasOwnProperty(13)) CN_TTS_ELEVENLABS_VOICE = settings[13];
-			if (settings.hasOwnProperty(14)) CN_TTS_ELEVENLABS_STABILITY = settings[14];
-			if (settings.hasOwnProperty(15)) CN_TTS_ELEVENLABS_SIMILARITY = settings[15];
+			if (settings.hasOwnProperty(0)) CN_SAY_THIS_TO_SEND = settings[0];
+			if (settings.hasOwnProperty(1)) CN_SAY_THIS_TO_CLEAR_BOX = settings[1];
 		}
 	} catch (ex) {
 		console.error(ex);
