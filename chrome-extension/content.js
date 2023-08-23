@@ -17,6 +17,8 @@ var CN_SAY_THIS_WORD_TO_STOP = "stop";
 // Determine which word will cause this script to temporarily pause
 var CN_SAY_THIS_WORD_TO_PAUSE = "pause";
 
+var CN_SAY_THIS_TO_CLEAR_BOX = "clear box";
+
 // Do we keep listening even when paused, so that we can resume by a vocal command?
 var CN_KEEP_LISTENING = true;
 
@@ -368,6 +370,24 @@ function CN_StartSpeechRecognition() {
 			jQuery(".CNStartZone").show();
 			jQuery(".CNActionButtons").hide();
 			
+			return;
+		}
+
+		// Check for "send message now" command
+		if (CN_RemovePunctuation(final_transcript) == CN_SAY_THIS_TO_SEND.toLowerCase().trim()) {
+			console.log("send message now detected ...")
+			// Trigger the send action (assuming there's a button for sending with an identifiable selector)
+			jQuery('button[title="Submit Message"]').click(); 
+	
+			// Clear the textarea
+			jQuery("div.input-group textarea#user-input").val('');
+			return;
+		}
+
+		// Check for "clear box" command
+		if (CN_RemovePunctuation(final_transcript) == CN_SAY_THIS_TO_CLEAR_BOX.toLowerCase().trim()) {
+			// Clear the textarea
+			jQuery("div.input-group textarea#user-input").val('');
 			return;
 		}
 		
