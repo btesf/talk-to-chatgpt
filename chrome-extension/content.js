@@ -5,93 +5,42 @@
 
 // Indicate a locale code such as 'fr-FR', 'en-US', to use a particular language for the speech recognition functionality (when you speak into the mic)
 // If you leave this blank, the system's default language will be used
-var CN_WANTED_LANGUAGE_SPEECH_REC = ""; //"fr-FR";
-
-var CN_SAY_THIS_TO_CLEAR_BOX = "clear box";
-
+let CN_WANTED_LANGUAGE_SPEECH_REC = ""; //"fr-FR";
+let CN_SAY_THIS_TO_CLEAR_BOX = "clear box";
 // Determine which word(s) will cause this script to send the current message (if auto-send disabled)
-var CN_SAY_THIS_TO_SEND = "send message now"; 
+let CN_SAY_THIS_TO_SEND = "send message now"; 
 
 // -------------------
 // CODE (DO NOT ALTER)
 // -------------------
-var CN_SPEECHREC = null;
-var CN_IS_LISTENING = false;
-var CN_FINISHED = false;
-var CN_PAUSED = false;
-var CN_TIMEOUT_KEEP_SPEECHREC_WORKING = null;
-var CN_SPEECH_REC_SUPPORTED = false;
-var CN_SPEECHREC_DISABLED = false;
-var CN_CONVERSATION_SUSPENDED = false;
-var CN_BAR_COLOR_FLASH_GREY = false;
+let CN_SPEECHREC = null;
+let CN_IS_LISTENING = false;
+let CN_FINISHED = false;
+let CN_PAUSED = false;
+let CN_TIMEOUT_KEEP_SPEECHREC_WORKING = null;
+let CN_SPEECH_REC_SUPPORTED = false;
+let CN_SPEECHREC_DISABLED = false;
 
 // Send a message to the bot (will simply put text in the textarea and simulate a send button click)
 function CN_SendMessage(text) {
 	// Put message in textarea
 	jQuery("div.input-group textarea#user-input").focus();
-	var existingText = jQuery("div.input-group textarea#user-input").val();
+	let existingText = jQuery("div.input-group textarea#user-input").val();
 	
 	// Is there already existing text?
 	if (!existingText) CN_SetTextareaValue(text);
 	else CN_SetTextareaValue(existingText+" "+text);
 	
 	// Change height in case
-	var fullText = existingText+" "+text;
-	var rows = Math.ceil( fullText.length / 88);
-	var height = rows * 24;
+	let fullText = existingText+" "+text;
+	let rows = Math.ceil( fullText.length / 88);
+	let height = rows * 24;
 	jQuery("div.input-group textarea#user-input").css("height", height+"px");
 	 
 	// No autosend, so continue recognizing
 	clearTimeout(CN_TIMEOUT_KEEP_SPEECHREC_WORKING);
 	CN_TIMEOUT_KEEP_SPEECHREC_WORKING = setTimeout(CN_KeepSpeechRecWorking, 100);
 
-}
-
-// Flash the red bar
-function CN_FlashRedBar() {
-	clearTimeout(CN_TIMEOUT_FLASHBAR);
-	
-	// Conversation no longer suspended?
-	if (!CN_CONVERSATION_SUSPENDED) {
-		return;
-	}
-	
-	// Is it green? don't do anything
-	if (CN_BAR_COLOR_FLASH_GREY) {
-		// Grey? switch to red
-		$("#CNStatusBar").css("background", "red");
-		CN_BAR_COLOR_FLASH_GREY = false;
-	} else {
-		// Anything else? switch to grey
-		$("#CNStatusBar").css("background", "grey");
-		CN_BAR_COLOR_FLASH_GREY = true;
-	}
-	
-	// Set another timeout
-	CN_TIMEOUT_FLASHBAR = setTimeout(function () {
-		CN_FlashRedBar();
-	}, 500);
-}
-
-// Resume after suspension
-function CN_ResumeAfterSuspension() {
-	// Make a beep sound
-	setTimeout(function () {
-		// Credits: https://freesound.org/people/plasterbrain/sounds/419493/
-		var snd = new Audio("data:audio/mpeg;base64,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OQAgKNwAUMrdjVn1//OEZAwMVMMuzzeyLxHJgoZeFqaKXlFPKH3UMEIXmJkbmIQPBAIr2eWTvwzssgYujuBheiNzev18A/vV3Uykchs5KYpgqPhuSTYDLClSJGqR76///U0oi4f/dkhmhs/9vb//////////9x9YDhAAgG0ww//XnAJD4T4sMIgNrH/1nBBpYAe8/smSK1LMKiaJlRsA4YHzothuz/b239X+ZFP/9ZASr/kf/89////2kPav/7UCA4AG4HH79MuS+HHL//OEZA0LqMEmKzeSPBKRhkweF06YToGhUdYqBxYqmGwIgqy6BYHYYDQiYHIphYALNgadtc7yGv/DPCNgAAiQEb4qAAwiizA9WA9kPgGXJgvmiD////of/y6e//////////T///oAVGoA/N+cFTtYMdQkDi8aFO26SVt0KgPmXUghAYBwAuNFabHLmv/+dsLLRLdVN0EDwa+DYnNBM1d1vvP///+d9vsgDgz//u+7/pUCALwAMAh/94V5RDbgICwA//OEZBAKoMEoLyuzLhW5hkmeFwSYFRljARjmBJeptYtO2rLlGRALmCgIsGh2mxyx7S/+9bmniU1cpUxgUKJjMOYLpFGJErHnX////R229bKHKKv////////rIQAwCyAbDtjc85A8YWOaOSBiQRphP7LqWedkCggwt3DDgXCAMy2HqW1S2pfrHWOVKXORGa6jyYHPR61vlrmuxql7////+/pqf0/aAjf6P/////27UcXSEhQeba6OwHOP+0xPswiC//OEZA8LbGsaBjRdBRNJglG+ByBcM15o02rHgw+BcDAklaxZghd8wQDA1XoozXCp44lXrb19b//WcsGQFFgDb1KcwMIg5aFhJx04hXqA+7/9dmQKu//1//////01//+uUSBAAIANsOAN4V6lPEGBiAKGB5oaTArBpbTXaSG1uGXUaAi04tNjlvLcs/+Z6rrtaZRvABRWYDSgDWMwX0E0P///tX9/raUm6v//9fVamiwBCuAYYAu/I84hTxhw05AC//N0ZBEK7MEivxe1OBMQ0lGWDvJqD5k85ZigASar9RmagNfAqEJgLGJiICCFLrS21ikyvUYhgYR8QURyACRAOkoULNEBLyKSf9Tf/+r7/W05///+39wr////vUEgBBfgAT+eAeFPLH7SxOr4ThSwHArEn9lVDBCO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");
-		snd.play();
-	}, 100);
-	
-	// Finish alternating colors, reset to grey
-	clearTimeout(CN_TIMEOUT_FLASHBAR);
-	$("#CNStatusBar").css("background", "grey");
-	
-	// Hide suspend area
-	jQuery("#CNSuspendedArea").hide();
-	
-	// Say OK and resume conversation
-	CN_PAUSED = false;
-	CN_CONVERSATION_SUSPENDED = false;
 }
 
 // Start speech recognition using the browser's speech recognition API
@@ -117,7 +66,7 @@ function CN_StartSpeechRecognition() {
 		console.log("Error while listening:", event.error);
 	  };
 	CN_SPEECHREC.onresult = (event) => {
-		var final_transcript = "";
+		let final_transcript = "";
 		for (let i = event.resultIndex; i < event.results.length; ++i) {
 			if (event.results[i].isFinal)
 				final_transcript += event.results[i][0].transcript;
@@ -147,13 +96,7 @@ function CN_StartSpeechRecognition() {
 			jQuery("div.input-group textarea#user-input").val('');
 			return;
 		}
-		
-		// Are we speaking?
-		if (CN_CONVERSATION_SUSPENDED) {
-			console.log("Conversation is currently suspended, voice command ignored. Use the pause word to resume conversation.");
-			return;
-		}
-		
+	
 		// Send the message
 		CN_SendMessage(final_transcript);
 	};
@@ -340,7 +283,6 @@ function CN_InitScript() {
 		jQuery(".CNToggle").css("cursor", "pointer");
 		jQuery(".CNToggle").on("click", CN_ToggleButtonClick);
 		jQuery("#CNStartButton").on("click", CN_StartTTGPT);
-		jQuery("#CNResumeButton").on("click", CN_ResumeAfterSuspension);
 		
 		// Make icons change opacity on hover
 		jQuery(".CNToggle, #CNStartButton, #CNResumeButton").on("mouseenter", function() { jQuery(this).css("opacity", 1); });
@@ -485,10 +427,3 @@ function CN_GetCookie(name) {
 	}, 500);
 	
 })();
-
-// List of languages for speech recognition - Pulled from https://www.google.com/intl/en/chrome/demos/speech.html
-var CN_SPEECHREC_LANGS =
-[['አማርኛ',           ['am-ET']],
- ['Deutsch',         ['de-DE']],
- ['English',         ['en-GB', 'United Kingdom'],
-                     ['en-US', 'United States']]];
